@@ -1,130 +1,126 @@
+#!/usr/bin/env python3
 """
-FunLang - Punto de entrada principal
-Sistema de Procesamiento de Lenguaje (SPL)
-
-Uso:
-    python main.py <archivo.fun>           # Compilar a C++
-    python main.py <archivo.fun> -r        # Compilar y ejecutar
-    python main.py <archivo.fun> -v        # Modo verbose
-    python main.py <archivo.fun> --tokens  # Solo mostrar tokens
-    python main.py <archivo.fun> --ast     # Solo mostrar AST
+FunLang Compiler - Punto de entrada principal
+Lenguaje funcional que compila a C++ ejecutable
 """
 
 import sys
 import os
+from pathlib import Path
 
-# Agregar el directorio src al path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# Agregar src al path
+sys.path.insert(0, str(Path(__file__).parent))
 
-from src.compiler import main as compiler_main, create_compiler
+from src.compiler import create_compiler
+from src.ast_nodes import ASTPrinter
 
 
-def demo():
-    """Demostración del compilador con un programa simple"""
-    
-    print("=" * 70)
-    print("  FunLang Compiler - Demostración")
-    print("  Lenguaje Funcional -> C++ Ejecutable")
-    print("=" * 70)
-    
-    # Programa de ejemplo: Algoritmo de Euclides
-    demo_code = '''
--- Algoritmo de Euclides para MCD
--- Ejemplo de programa en FunLang
+def print_header():
+    print("=" * 60)
+    print("  FunLang Compiler")
+    print("  Lenguaje funcional -> C++ ejecutable")
+    print("=" * 60)
+    print()
 
--- Función factorial recursiva
+
+def run_demo():
+    """Ejecuta una demostración del compilador"""
+    demo_code = '''-- Ejemplo: Factorial recursivo
 factorial n = if n <= 1 then 1 else n * factorial(n - 1)
 
--- Función principal
 main = do
-    let x = 5
     println("Calculando factorial de 5:")
-    let resultado = factorial(x)
+    let resultado = factorial(5)
     print("5! = ")
     println(resultado)
-    return resultado
+    return 0
 end
 '''
     
-    print("\n[CÓDIGO FUENTE FunLang]")
+    print_header()
+    print("[CÓDIGO FUENTE]")
     print("-" * 40)
     print(demo_code)
     print("-" * 40)
+    print()
     
-    # Compilar
-    compiler = create_compiler(verbose=True)
+    compiler = create_compiler()
+    result = compiler.compile(demo_code, "demo")
     
-    output_dir = os.path.join(os.path.dirname(__file__), "output")
-    os.makedirs(output_dir, exist_ok=True)
-    
-    cpp_path = os.path.join(output_dir, "demo.cpp")
-    result = compiler.compile(demo_code, cpp_path)
-    
-    if result.success:
-        print("\n" + "=" * 70)
+    if result['success']:
+        print("[COMPILACIÓN EXITOSA]")
+        print(f"Archivo generado: {result['output_file']}")
+        print()
         print("[CÓDIGO C++ GENERADO]")
-        print("=" * 70)
-        print(result.cpp_code)
-        
-        print("\n" + "=" * 70)
-        print(f"Archivo guardado: {cpp_path}")
-        print("=" * 70)
-        
-        # Intentar compilar y ejecutar con g++
-        print("\n¿Desea compilar y ejecutar el código C++? (requiere g++)")
-        print("Para compilar manualmente:")
-        print(f"  g++ -std=c++17 -O2 {cpp_path} -o {output_dir}/demo")
+        print("-" * 40)
+        print(result['cpp_code'])
     else:
-        print("\n[ERRORES DE COMPILACIÓN]")
-        for err in result.errors:
-            print(f"  {err}")
+        print("[ERRORES]")
+        for error in result['errors']:
+            print(f"  - {error}")
 
 
 def run_tests():
-    """Ejecuta los programas de prueba"""
-    tests_dir = os.path.join(os.path.dirname(__file__), "tests")
-    output_dir = os.path.join(os.path.dirname(__file__), "output")
+    """Ejecuta todos los programas de prueba"""
+    print_header()
+    print("Ejecutando programas de prueba...")
+    print()
     
-    if not os.path.exists(tests_dir):
-        print(f"Directorio de pruebas no encontrado: {tests_dir}")
-        return
+    tests_dir = Path(__file__).parent / "tests"
+    compiler = create_compiler()
     
-    os.makedirs(output_dir, exist_ok=True)
+    results = {'passed': 0, 'failed': 0}
     
-    compiler = create_compiler(verbose=False)
-    
-    test_files = [f for f in os.listdir(tests_dir) if f.endswith('.fun')]
-    
-    print("=" * 70)
-    print("  Ejecutando programas de prueba")
-    print("=" * 70)
-    
-    for test_file in sorted(test_files):
-        input_path = os.path.join(tests_dir, test_file)
-        output_path = os.path.join(output_dir, test_file.replace('.fun', '.cpp'))
+    for test_file in sorted(tests_dir.glob("*.fun")):
+        name = test_file.stem
+        print(f"[{test_file.name}] ", end="")
         
-        print(f"\n[{test_file}]")
+        result = compiler.compile_file(str(test_file))
         
-        result = compiler.compile_file(input_path, output_path)
-        
-        if result.success:
-            print(f"  ✓ Compilado exitosamente -> {os.path.basename(output_path)}")
-            if result.warnings:
-                for w in result.warnings:
-                    print(f"  ⚠ {w}")
+        if result['success']:
+            print(f"✓ -> {name}.cpp")
+            results['passed'] += 1
         else:
-            print(f"  ✗ Error de compilación")
-            for e in result.errors:
-                print(f"    {e}")
+            print("✗ Error")
+            for error in result['errors']:
+                print(f"    {error}")
+            results['failed'] += 1
+    
+    print()
+    print("-" * 40)
+    print(f"Resultados: {results['passed']} exitosos, {results['failed']} fallidos")
+
+
+def compile_file(filepath: str):
+    """Compila un archivo específico"""
+    print_header()
+    
+    compiler = create_compiler()
+    result = compiler.compile_file(filepath)
+    
+    if result['success']:
+        print(f"[OK] Compilado: {result['output_file']}")
+    else:
+        print("[ERROR]")
+        for error in result['errors']:
+            print(f"  - {error}")
+
+
+def main():
+    if len(sys.argv) < 2:
+        run_demo()
+    elif sys.argv[1] == "--test":
+        run_tests()
+    elif sys.argv[1] == "--help":
+        print("Uso: python main.py [archivo.fun] [--test]")
+        print()
+        print("Opciones:")
+        print("  (sin args)    Ejecuta demo")
+        print("  archivo.fun   Compila el archivo")
+        print("  --test        Ejecuta todos los tests")
+    else:
+        compile_file(sys.argv[1])
 
 
 if __name__ == "__main__":
-    if len(sys.argv) == 1:
-        # Sin argumentos: ejecutar demo
-        demo()
-    elif sys.argv[1] == "--test":
-        # Ejecutar pruebas
-        run_tests()
-    else:
-        # Usar el CLI del compilador
-        compiler_main()
+    main()
