@@ -1,0 +1,232 @@
+(* ============================================================================
+   FunLang - Gramática E-BNF
+   Lenguaje Funcional con soporte imperativo para SPL
+   Compatible con https://www.bottlecaps.de/rr/ui
+   ============================================================================ *)
+
+(* ===== PROGRAMA PRINCIPAL ===== *)
+Program       ::= ModuleDecl? ImportList? DeclList
+
+ModuleDecl    ::= 'module' IDENTIFIER 'where'
+
+ImportList    ::= Import+
+
+Import        ::= 'import' IDENTIFIER ('as' IDENTIFIER)?
+
+DeclList      ::= Declaration+
+
+(* ===== DECLARACIONES ===== *)
+Declaration   ::= FunctionDecl
+                | TypeDecl
+                | VarDecl
+                | ConstDecl
+                | DataDecl
+
+(* ===== DECLARACIÓN DE FUNCIONES (estilo Haskell) ===== *)
+FunctionDecl  ::= FunctionSig? FunctionDef
+
+FunctionSig   ::= IDENTIFIER '::' TypeExpr
+
+FunctionDef   ::= IDENTIFIER ParamList? '=' Expression
+                | IDENTIFIER ParamList? GuardedExpr+
+
+ParamList     ::= Pattern+
+
+GuardedExpr   ::= '|' Expression '=' Expression
+
+(* ===== PATRONES (Pattern Matching) ===== *)
+Pattern       ::= IDENTIFIER
+                | Literal
+                | '(' Pattern ')'
+                | Pattern ':' Pattern
+                | '[' PatternList? ']'
+                | '(' PatternList ')'
+                | '_'
+
+PatternList   ::= Pattern (',' Pattern)*
+
+(* ===== DECLARACIÓN DE TIPOS ===== *)
+TypeDecl      ::= 'type' IDENTIFIER TypeParams? '=' TypeExpr
+
+DataDecl      ::= 'data' IDENTIFIER TypeParams? '=' DataConstrs
+
+TypeParams    ::= IDENTIFIER+
+
+DataConstrs   ::= DataConstr ('|' DataConstr)*
+
+DataConstr    ::= CONSTRUCTOR TypeExpr*
+
+(* ===== EXPRESIONES DE TIPO ===== *)
+TypeExpr      ::= BaseType
+                | TypeExpr '->' TypeExpr
+                | '[' TypeExpr ']'
+                | '(' TypeExpr (',' TypeExpr)* ')'
+                | IDENTIFIER TypeExpr*
+                | 'Matrix' TypeExpr
+
+BaseType      ::= 'Int'
+                | 'Float'
+                | 'Double'
+                | 'Bool'
+                | 'Char'
+                | 'String'
+                | 'Void'
+                | IDENTIFIER
+
+(* ===== DECLARACIÓN DE VARIABLES ===== *)
+VarDecl       ::= 'let' IDENTIFIER (':' TypeExpr)? '=' Expression
+                | 'var' IDENTIFIER (':' TypeExpr)? '=' Expression
+
+ConstDecl     ::= 'const' IDENTIFIER (':' TypeExpr)? '=' Expression
+
+(* ===== EXPRESIONES ===== *)
+Expression    ::= LetExpr
+                | IfExpr
+                | CaseExpr
+                | LambdaExpr
+                | WhileExpr
+                | ForExpr
+                | DoBlock
+                | LogicalOrExpr
+
+(* ===== LET EXPRESSION ===== *)
+LetExpr       ::= 'let' LetBindings 'in' Expression
+
+LetBindings   ::= LetBinding (';' LetBinding)*
+
+LetBinding    ::= IDENTIFIER '=' Expression
+
+(* ===== IF-THEN-ELSE ===== *)
+IfExpr        ::= 'if' Expression 'then' Expression 'else' Expression
+
+(* ===== CASE EXPRESSION (Pattern Matching) ===== *)
+CaseExpr      ::= 'case' Expression 'of' CaseAlts
+
+CaseAlts      ::= CaseAlt+
+
+CaseAlt       ::= Pattern '->' Expression
+
+(* ===== LAMBDA EXPRESSION ===== *)
+LambdaExpr    ::= '\' ParamList '->' Expression
+                | 'fn' ParamList '->' Expression
+
+(* ===== WHILE LOOP ===== *)
+WhileExpr     ::= 'while' Expression 'do' Expression 'end'
+
+(* ===== FOR LOOP ===== *)
+ForExpr       ::= 'for' IDENTIFIER 'in' Expression '..' Expression 'do' Expression 'end'
+                | 'for' IDENTIFIER 'in' Expression 'do' Expression 'end'
+
+(* ===== DO BLOCK (secuencia de acciones) ===== *)
+DoBlock       ::= 'do' DoStatements 'end'
+
+DoStatements  ::= DoStatement+
+
+DoStatement   ::= Expression ';'?
+                | IDENTIFIER '<-' Expression ';'?
+                | 'let' IDENTIFIER '=' Expression ';'?
+                | 'return' Expression ';'?
+
+(* ===== EXPRESIONES LÓGICAS ===== *)
+LogicalOrExpr ::= LogicalAndExpr ('||' LogicalAndExpr)*
+
+LogicalAndExpr::= EqualityExpr ('&&' EqualityExpr)*
+
+EqualityExpr  ::= RelationalExpr (('==' | '!=' | '/=') RelationalExpr)*
+
+RelationalExpr::= AdditiveExpr (('<' | '>' | '<=' | '>=') AdditiveExpr)*
+
+(* ===== EXPRESIONES ARITMÉTICAS ===== *)
+AdditiveExpr  ::= MultiplicativeExpr (('+' | '-') MultiplicativeExpr)*
+
+MultiplicativeExpr ::= PowerExpr (('*' | '/' | '%' | 'mod' | 'div') PowerExpr)*
+
+PowerExpr     ::= UnaryExpr ('^' | '**') PowerExpr
+                | UnaryExpr
+
+UnaryExpr     ::= '-' UnaryExpr
+                | 'not' UnaryExpr
+                | '!' UnaryExpr
+                | PostfixExpr
+
+(* ===== EXPRESIONES POSTFIJAS ===== *)
+PostfixExpr   ::= PrimaryExpr PostfixOp*
+
+PostfixOp     ::= '(' ArgList? ')'
+                | '[' Expression ']'
+                | '[' Expression ',' Expression ']'
+                | '.' IDENTIFIER
+                | '!!' Expression
+
+(* ===== ARGUMENTOS DE FUNCIÓN ===== *)
+ArgList       ::= Expression (',' Expression)*
+
+(* ===== EXPRESIONES PRIMARIAS ===== *)
+PrimaryExpr   ::= Literal
+                | IDENTIFIER
+                | CONSTRUCTOR
+                | '(' Expression ')'
+                | '(' Expression (',' Expression)+ ')'
+                | ListExpr
+                | ArrayExpr
+                | MatrixExpr
+                | RangeExpr
+                | ListComprehension
+
+(* ===== LITERALES ===== *)
+Literal       ::= INTEGER
+                | FLOAT
+                | CHAR
+                | STRING
+                | 'True'
+                | 'False'
+
+(* ===== LISTAS ===== *)
+ListExpr      ::= '[' (Expression (',' Expression)*)? ']'
+
+RangeExpr     ::= '[' Expression '..' Expression ']'
+                | '[' Expression ',' Expression '..' Expression ']'
+
+ListComprehension ::= '[' Expression '|' Qualifiers ']'
+
+Qualifiers    ::= Qualifier (',' Qualifier)*
+
+Qualifier     ::= IDENTIFIER '<-' Expression
+                | Expression
+
+(* ===== ARREGLOS ===== *)
+ArrayExpr     ::= 'array' '[' (Expression (',' Expression)*)? ']'
+                | '#[' (Expression (',' Expression)*)? ']'
+
+(* ===== MATRICES ===== *)
+MatrixExpr    ::= 'matrix' '[' MatrixRows ']'
+                | '#{' MatrixRows '}'
+
+MatrixRows    ::= MatrixRow (';' MatrixRow)*
+
+MatrixRow     ::= Expression (',' Expression)*
+
+(* ===== TOKENS LÉXICOS ===== *)
+IDENTIFIER    ::= [a-z_][a-zA-Z0-9_']*
+
+CONSTRUCTOR   ::= [A-Z][a-zA-Z0-9_]*
+
+INTEGER       ::= [0-9]+
+                | '0x' [0-9a-fA-F]+
+                | '0b' [01]+
+                | '0o' [0-7]+
+
+FLOAT         ::= [0-9]+ '.' [0-9]+ (('e' | 'E') ('+' | '-')? [0-9]+)?
+
+CHAR          ::= "'" ([^'\\] | EscapeSeq) "'"
+
+STRING        ::= '"' ([^"\\] | EscapeSeq)* '"'
+
+EscapeSeq     ::= '\\' ('n' | 't' | 'r' | '\\' | "'" | '"' | '0')
+
+(* ===== COMENTARIOS ===== *)
+COMMENT       ::= '--' [^\n]*
+                | '{-' .* '-}'
+
+(* ===== ESPACIOS EN BLANCO ===== *)
+WHITESPACE    ::= [ \t\n\r]+
